@@ -1,14 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef _OPENMP
-# include <omp.h>
-#endif
+#include <omp.h>
+
+// Antônio Costa Satiro de Souza 10723636
 
 void Trap(double a, double b, int n, double* global_result_p);
 
-double f(double a){
-
-    return ((a*a) + (4.0*a) + 2.0); 
+double f(double x) {
+    return (x * x) + (4.0 * x) + 2.0;
 }
 
 int main(int argc, char* argv[]) {
@@ -17,14 +16,25 @@ int main(int argc, char* argv[]) {
     int n;
     int thread_count;
 
+    if (argc < 2) {
+        fprintf(stderr, "Uso: %s <num_threads>\n", argv[0]);
+        return 1;
+    }
     thread_count = strtol(argv[1], NULL, 10);
+
     printf("Enter a, b, and n\n");
     scanf("%lf %lf %d", &a, &b, &n);
-    #   pragma omp parallel num_threads(thread_count)
-        reduction(+: *global_result)
-        Trap(a, b, n, &global_result);
 
-    printf("With n =%d trapezoids, our estimate \n", n);
+    if (n % thread_count != 0) {
+        fprintf(stderr, "n deve ser divisivel pelo numero de threads\n");
+        return 1;
+    }
+
+#   pragma omp parallel num_threads(thread_count) \
+        reduction(+: global_result)
+    Trap(a, b, n, &global_result);
+
+    printf("With n = %d trapezoids, our estimate\n", n);
     printf("of the integral from %f to %f = %.14e\n", a, b, global_result);
     return 0;
 }
@@ -36,16 +46,16 @@ void Trap(double a, double b, int n, double* global_result_p) {
     int my_rank = omp_get_thread_num();
     int thread_count = omp_get_num_threads();
 
-    h = (b-a)/n;
-    local_n = n/thread_count;
-    local_a = a + my_rank+local_n*h;
-    local_b = local_a + local_n*h;
-    my_result = (f(local_a) + f(local_b))/2.0;
-    for(i = 1; i<= local_n -1; i++) {
-        x = local_a + i*h;
+    h = (b - a) / n;
+    local_n = n / thread_count;
+    local_a = a + my_rank * local_n * h;
+    local_b = local_a + local_n * h;
+    my_result = (f(local_a) + f(local_b)) / 2.0;
+    for (i = 1; i <= local_n - 1; i++) {
+        x = local_a + i * h;
         my_result += f(x);
     }
-    my_result = my_result*h;
+    my_result = my_result * h;
 
-    *global_result_p += my_result; 
+    *global_result_p += my_result;
 }
